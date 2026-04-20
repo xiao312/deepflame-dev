@@ -12,8 +12,11 @@ Foam::scalar Foam::dfChemistryModel<ThermoType>::solve_DNN(const DeltaTType &del
     }
 
     std::chrono::steady_clock::time_point start = std::chrono::steady_clock::now();
+    const bool distributedOnnx =
+        inferenceBackendType_ == "onnxRuntime" && !inferenceCentralized_;
+
     Info << "=== begin solve_DNN === " << endl;
-    if (gpu_)
+    if (gpu_ && !distributedOnnx)
     {
         Info << "now DNN inference is conducted on GPU" << endl;
     }
@@ -35,7 +38,7 @@ Foam::scalar Foam::dfChemistryModel<ThermoType>::solve_DNN(const DeltaTType &del
     std::chrono::duration<double> processingTime10 = std::chrono::duration_cast<std::chrono::duration<double>>(stop10 - start10);
     time_getProblems_ += processingTime10.count();
 
-    if (gpu_)
+    if (gpu_ && !distributedOnnx)
     {
         /*==============================send problems==============================*/
         std::chrono::steady_clock::time_point start2 = std::chrono::steady_clock::now();
@@ -124,9 +127,17 @@ Foam::scalar Foam::dfChemistryModel<ThermoType>::solve_DNN(const DeltaTType &del
             // kept for backward-compatible profiling bucket name
             time_vec2ndarray_ += processingTime8.count();
 
+            if (!inferenceBackend_.valid())
+            {
+                FatalErrorInFunction
+                    << "Inference backend is not available on this rank for solve_DNN. "
+                    << "Only inference-owning ranks should execute backend inference."
+                    << abort(FatalError);
+            }
+
             std::chrono::steady_clock::time_point start9 = std::chrono::steady_clock::now();
             const int size = outputLength[0] * mixture_.nSpecies(); // sample_length * sample_number
-            std::vector<double> outputsVec0 = pytorchBackend_().inferFlat(DNNinputs[0], size);
+            std::vector<double> outputsVec0 = inferenceBackend_().inferFlat(DNNinputs[0], size);
             std::chrono::steady_clock::time_point stop9 = std::chrono::steady_clock::now();
             std::chrono::duration<double> processingTime9 = std::chrono::duration_cast<std::chrono::duration<double>>(stop9 - start9);
             time_python_ += processingTime9.count();
@@ -258,8 +269,15 @@ Foam::scalar Foam::dfChemistryModel<ThermoType>::solve_DNN(const DeltaTType &del
         std::vector<std::vector<label>> problemCounter; // evaluate the number of the problems of each subslave
         problemBuffer.append(GPUproblemList);
         getDNNinputs(problemBuffer, outputLength, DNNinputs, cellIDBuffer, problemCounter);
+        if (!inferenceBackend_.valid())
+        {
+            FatalErrorInFunction
+                << "Inference backend is not available on this rank for solve_DNN."
+                << abort(FatalError);
+        }
+
         std::vector<double> outputsVec0 =
-            pytorchBackend_().inferFlat(DNNinputs[0], outputLength[0] * mixture_.nSpecies());
+            inferenceBackend_().inferFlat(DNNinputs[0], outputLength[0] * mixture_.nSpecies());
         std::vector<std::vector<double>> results = {outputsVec0};
         updateSolutionBuffer(solutionBuffer, results, cellIDBuffer, problemCounter);
         DynamicList<GpuSolution> finalList;

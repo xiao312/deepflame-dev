@@ -10,6 +10,8 @@ unset PYTORCH_LIB
 unset USE_GPUSOLVER
 unset AMGX_DIR
 unset ODE_GPU_SOLVER
+unset ONNXRUNTIME_DIR
+unset ONNXRUNTIME_LIB
 
 print_usage() {
     echo "Usage: . install.sh --libtorch_no (default) | --libtorch_dir _path_to_libtorch | --libtorch_autodownload | --use_pytorch | --libcantera_dir _path_to_libcantera
@@ -150,6 +152,32 @@ if [ $USE_PYTORCH = true ]; then
         return
     fi
     PYTORCH_LIB=`pkg-config --libs python3-embed`
+    ONNXRUNTIME_DIR=`python3 - <<'PY'
+import pathlib
+try:
+    import onnxruntime
+    print(pathlib.Path(onnxruntime.__file__).resolve().parent / 'capi')
+except Exception:
+    print('')
+PY`
+    if [ ! -z "$ONNXRUNTIME_DIR" ]; then
+        ONNXRUNTIME_LIB=`python3 - <<'PY'
+import pathlib
+try:
+    import onnxruntime
+    capi = pathlib.Path(onnxruntime.__file__).resolve().parent / 'capi'
+    libs = sorted(capi.glob('libonnxruntime.so.*'))
+    print(libs[-1] if libs else '')
+except Exception:
+    print('')
+PY`
+        if [ ! -z "$ONNXRUNTIME_LIB" ]; then
+            rm -f "$ONNXRUNTIME_DIR/libonnxruntime.so"
+            rm -f "$ONNXRUNTIME_DIR/libonnxruntime.so.1"
+            ln -sf `basename "$ONNXRUNTIME_LIB"` "$ONNXRUNTIME_DIR/libonnxruntime.so"
+            ln -sf `basename "$ONNXRUNTIME_LIB"` "$ONNXRUNTIME_DIR/libonnxruntime.so.1"
+        fi
+    fi
 fi
 
 
@@ -164,6 +192,8 @@ fi
 if [ $USE_PYTORCH = true ]; then
     echo PYTORCH_INC=$PYTORCH_INC
     echo PYTORCH_LIB=$PYTORCH_LIB
+    echo ONNXRUNTIME_DIR=$ONNXRUNTIME_DIR
+    echo ONNXRUNTIME_LIB=$ONNXRUNTIME_LIB
     echo LIBTORCH_DIR=""
 fi
 if [ $USE_GPUSOLVER = true ]; then
@@ -179,6 +209,8 @@ sed -i "s#LIBTORCH_DIR#$LIBTORCH_DIR#g" ./bashrc
 sed -i "s#PYTORCH_INC#$PYTORCH_INC#g" ./bashrc
 sed -i "s#PYTORCH_LIB#$PYTORCH_LIB#g" ./bashrc
 sed -i "s#LIBCANTERA_DIR#$LIBCANTERA_DIR#g" ./bashrc
+sed -i "s#@ONNXRUNTIME_DIR@#$ONNXRUNTIME_DIR#g" ./bashrc
+sed -i "s#@ONNXRUNTIME_LIB@#$ONNXRUNTIME_LIB#g" ./bashrc
 sed -i "s#@AMGX_DIR@#$AMGX_DIR#g" ./bashrc
 sed -i "s#@ODE_GPU_SOLVER@#$OPENCC_PATH#g" ./bashrc
 

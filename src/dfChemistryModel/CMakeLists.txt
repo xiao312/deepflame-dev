@@ -16,6 +16,7 @@ include_directories(
                     ${MPI_INCLUDE_PATH}
                     ${OpenFOAM_SRC}/Pstream/mpi
                     ${CANTERA_ROOT}/include
+                    ${workDir}/inference/third_party/onnxruntime
                     )
 
 
@@ -32,7 +33,9 @@ ${LB}/RecvBuffer.C
 ${LB}/algorithms_DLB.C
 ${LB}/runtime_assert.C
 ${LB}/LoadBalancer.C
+${workDir}/inference/InferenceBackend.C
 ${workDir}/inference/PyTorchEmbeddedBackend.C
+${workDir}/inference/OnnxRuntimeBackend.C
 ${workDir}/makeDfChemistryModels.C
 )
 add_library(dfChemistryModel SHARED ${SOURCES})
@@ -54,6 +57,10 @@ endif()
 
 # dynamic link
 target_link_libraries(${PROJECT_NAME} ${OpenFOAM_LIB_DIR}/libcompressibleTransportModels.so libturbulenceModels.so)
+
+if(DEFINED ENV{ONNXRUNTIME_LIB} AND NOT "$ENV{ONNXRUNTIME_LIB}" STREQUAL "")
+  target_link_libraries(${PROJECT_NAME} $ENV{ONNXRUNTIME_LIB})
+endif()
 
 target_link_libraries(${PROJECT_NAME} ${CANTERA_ROOT}/lib/libcantera.so.2)
 

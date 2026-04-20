@@ -197,7 +197,15 @@ Foam::dfChemistryModel<ThermoType>::dfChemistryModel
 
     time_vec2ndarray_ = 0;
     time_python_ = 0;
-    pytorchBackend_.clear();
+    inferenceBackendType_ = this->subDict("TorchSettings").lookupOrDefault("backend", word("pytorchEmbedded"));
+    inferenceBackendModule_ = this->subDict("TorchSettings").lookupOrDefault("backendModule", fileName("inference"));
+    inferenceBackendArtifact_ = this->subDict("TorchSettings").lookupOrDefault("onnxModel", fileName(""));
+    inferenceExecutionProvider_ = this->subDict("TorchSettings").lookupOrDefault("onnxExecutionProvider", word("cpu"));
+    inferenceIntraOpThreads_ = this->subDict("TorchSettings").lookupOrDefault("onnxIntraOpThreads", 1);
+    inferenceInputFeatureSize_ = this->subDict("TorchSettings").lookupOrDefault("onnxInputFeatureSize", 0);
+    inferenceDeviceId_ = this->subDict("TorchSettings").lookupOrDefault("onnxDeviceId", 0);
+    inferenceCentralized_ = this->subDict("TorchSettings").lookupOrDefault("onnxCentralized", true);
+    inferenceBackend_.clear();
 
     useThermoTranNN = this->lookupOrDefault("useThermoTranNN", false);
     if(useThermoTranNN)
@@ -208,7 +216,40 @@ Foam::dfChemistryModel<ThermoType>::dfChemistryModel
 
     if (torchSwitch_)
     {
-        pytorchBackend_.reset(new PyTorchEmbeddedBackend("inference"));
+        const bool createBackendNow =
+            inferenceBackendType_ != "onnxRuntime" || ownsInferenceWork();
+
+        if (createBackendNow)
+        {
+            inferenceBackend_ = InferenceBackend::New(
+                inferenceBackendType_,
+                inferenceBackendModule_,
+                inferenceBackendArtifact_,
+                inferenceExecutionProvider_,
+                inferenceIntraOpThreads_,
+                inferenceInputFeatureSize_,
+                inferenceDeviceId_);
+
+            Info << nl << "Inference backend initialized: " << inferenceBackendType_;
+            if (inferenceBackendType_ == "onnxRuntime")
+            {
+                Info << " (model=" << inferenceBackendArtifact_
+                     << ", provider=" << inferenceExecutionProvider_
+                     << ", deviceId=" << inferenceDeviceId_
+                     << ", centralized=" << inferenceCentralized_ << ")";
+            }
+            else if (inferenceBackendType_ == "pytorchEmbedded")
+            {
+                Info << " (module=" << inferenceBackendModule_ << ")";
+            }
+            Info << nl << endl;
+        }
+        else
+        {
+            Info << nl
+                 << "Inference backend deferred on non-owner rank: "
+                 << inferenceBackendType_ << nl << endl;
+        }
     }
 
 #endif
@@ -217,21 +258,34 @@ Foam::dfChemistryModel<ThermoType>::dfChemistryModel
     // if use torch, create new communicator for solving cvode
     if (torchSwitch_)
     {
-        labelList subRank;
-        for (int rank = 0; rank < Pstream::nProcs(); rank ++)
+        const bool distributedOnnx =
+            inferenceBackendType_ == "onnxRuntime" && !inferenceCentralized_;
+
+        if (distributedOnnx)
         {
-            if (rank % cores_)
-            {
-                subRank.append(rank);
-            }
+            cvodeComm = UPstream::worldComm;
+            Info << nl
+                 << "ONNX distributed mode: using world communicator for chemistry and local ONNX sessions"
+                 << nl << endl;
         }
-        cvodeComm = UPstream::allocateCommunicator(UPstream::worldComm, subRank, true);
-        if(Pstream::myProcNo() % cores_)
+        else
         {
-            label sub_rank;
-            MPI_Comm_rank(PstreamGlobals::MPICommunicators_[cvodeComm], &sub_rank);
-            std::cout<<"my ProcessNo in worldComm = " << Pstream::myProcNo() << ' '
-            << "my ProcessNo in cvodeComm = "<<Pstream::myProcNo(cvodeComm)<<std::endl;
+            labelList subRank;
+            for (int rank = 0; rank < Pstream::nProcs(); rank ++)
+            {
+                if (rank % cores_)
+                {
+                    subRank.append(rank);
+                }
+            }
+            cvodeComm = UPstream::allocateCommunicator(UPstream::worldComm, subRank, true);
+            if(Pstream::myProcNo() % cores_)
+            {
+                label sub_rank;
+                MPI_Comm_rank(PstreamGlobals::MPICommunicators_[cvodeComm], &sub_rank);
+                std::cout<<"my ProcessNo in worldComm = " << Pstream::myProcNo() << ' '
+                << "my ProcessNo in cvodeComm = "<<Pstream::myProcNo(cvodeComm)<<std::endl;
+            }
         }
     }
 #endif

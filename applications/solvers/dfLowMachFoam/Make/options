@@ -1,5 +1,7 @@
 -include $(GENERAL_RULES)/mplibType
 
+ONNXRUNTIME_ROOT := $(shell printf %s "$$ONNXRUNTIME_ROOT")
+
 EXE_INC = -std=c++14 \
     -g \
     -fopenmp \
@@ -70,6 +72,7 @@ EXE_LIBS = \
     -ldfChemistryModel \
     -ldfCombustionModels  \
     $(CANTERA_ROOT)/lib/libcantera.so \
+    $(if $(ONNXRUNTIME_ROOT),-L$(ONNXRUNTIME_ROOT) -lonnxruntime,) \
     $(if $(LIBTORCH_ROOT),$(LIBTORCH_ROOT)/lib/libtorch.so,) \
     $(if $(LIBTORCH_ROOT),$(LIBTORCH_ROOT)/lib/libc10.so,) \
     $(if $(LIBTORCH_ROOT),-rdynamic,) \

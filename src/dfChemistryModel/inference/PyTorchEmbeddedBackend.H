@@ -3,6 +3,8 @@
 
 #ifdef USE_PYTORCH
 
+#include "InferenceBackend.H"
+
 #include <pybind11/embed.h>
 #include <pybind11/numpy.h>
 
@@ -13,6 +15,8 @@ namespace Foam
 {
 
 class PyTorchEmbeddedBackend
+:
+    public InferenceBackend
 {
 private:
     bool initialized_;
@@ -26,7 +30,7 @@ public:
 
     std::vector<double> inferFlat(
         const std::vector<double>& flatInput,
-        std::size_t outputSize);
+        std::size_t outputSize) override;
 };
 
 } // End namespace Foam

@@ -54,7 +54,7 @@ SourceFiles
 #include "GpuProblem.H"
 #include "GpuSolution.H"
 #include "DynamicBuffer.H"
-#include "PyTorchEmbeddedBackend.H"
+#include "InferenceBackend.H"
 #endif
 
 #include "CanteraMixture.H"
@@ -176,7 +176,15 @@ public IOdictionary
         double time_vec2ndarray_;
         double time_python_;
         pybind11::module_ call_ThermoTranNN; // to import inference file
-        autoPtr<PyTorchEmbeddedBackend> pytorchBackend_;
+        word inferenceBackendType_;
+        fileName inferenceBackendModule_;
+        fileName inferenceBackendArtifact_;
+        word inferenceExecutionProvider_;
+        label inferenceIntraOpThreads_;
+        label inferenceInputFeatureSize_;
+        label inferenceDeviceId_;
+        Switch inferenceCentralized_;
+        autoPtr<InferenceBackend> inferenceBackend_;
 #endif
 
         // Load balancing object
@@ -237,6 +245,13 @@ public IOdictionary
         }
 
 #if defined USE_LIBTORCH || defined USE_PYTORCH
+        bool ownsInferenceWork() const
+        {
+            const bool distributedOnnx =
+                inferenceBackendType_ == "onnxRuntime" && !inferenceCentralized_;
+            return !gpu_ || distributedOnnx || !(Pstream::myProcNo() % cores_);
+        }
+
         /*============= private methods in solve_DNN =============*/
         //- get a list of GPU problems to be solved
         template<class DeltaTType>

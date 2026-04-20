@@ -54,6 +54,7 @@ SourceFiles
 #include "GpuProblem.H"
 #include "GpuSolution.H"
 #include "DynamicBuffer.H"
+#include "PyTorchEmbeddedBackend.H"
 #endif
 
 #include "CanteraMixture.H"
@@ -175,6 +176,7 @@ public IOdictionary
         double time_vec2ndarray_;
         double time_python_;
         pybind11::module_ call_ThermoTranNN; // to import inference file
+        autoPtr<PyTorchEmbeddedBackend> pytorchBackend_;
 #endif
 
         // Load balancing object

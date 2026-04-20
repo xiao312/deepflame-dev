@@ -197,6 +197,7 @@ Foam::dfChemistryModel<ThermoType>::dfChemistryModel
 
     time_vec2ndarray_ = 0;
     time_python_ = 0;
+    pytorchBackend_.clear();
 
     useThermoTranNN = this->lookupOrDefault("useThermoTranNN", false);
     if(useThermoTranNN)
@@ -205,6 +206,10 @@ Foam::dfChemistryModel<ThermoType>::dfChemistryModel
         Info << nl << "ThermoTranNN.py was loaded." << nl << endl;
     }
 
+    if (torchSwitch_)
+    {
+        pytorchBackend_.reset(new PyTorchEmbeddedBackend("inference"));
+    }
 
 #endif
 

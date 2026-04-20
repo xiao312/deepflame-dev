@@ -119,41 +119,24 @@ Foam::scalar Foam::dfChemistryModel<ThermoType>::solve_DNN(const DeltaTType &del
             std::chrono::steady_clock::time_point start7 = std::chrono::steady_clock::now();
             std::chrono::steady_clock::time_point start8 = std::chrono::steady_clock::now();
 
-            // cast vector to np.array
-            auto input = pybind11::array_t<double>({DNNinputs[0].size()},
-                                                   {sizeof(double)},
-                                                   DNNinputs[0].data());
-
             std::chrono::steady_clock::time_point stop8 = std::chrono::steady_clock::now();
             std::chrono::duration<double> processingTime8 = std::chrono::duration_cast<std::chrono::duration<double>>(stop8 - start8);
-            // std::cout << "vec2ndarrayTime = " << processingTime8.count() << std::endl;
+            // kept for backward-compatible profiling bucket name
             time_vec2ndarray_ += processingTime8.count();
 
-            pybind11::module_ call_torch = pybind11::module_::import("inference"); // import python file
-
             std::chrono::steady_clock::time_point start9 = std::chrono::steady_clock::now();
-
-            pybind11::array_t<double, pybind11::array::c_style |
-                                      pybind11::array::forcecast>
-                result = call_torch.attr("inference")(input); // call python function
-            // Data in NumPy arrays is not guaranteed to packed in a dense manner.
-            // https://pybind11.readthedocs.io/en/stable/advanced/pycpp/numpy.html#arrays
-
+            const int size = outputLength[0] * mixture_.nSpecies(); // sample_length * sample_number
+            std::vector<double> outputsVec0 = pytorchBackend_().inferFlat(DNNinputs[0], size);
             std::chrono::steady_clock::time_point stop9 = std::chrono::steady_clock::now();
             std::chrono::duration<double> processingTime9 = std::chrono::duration_cast<std::chrono::duration<double>>(stop9 - start9);
-            // std::cout << "pythonTime = " << processingTime9.count() << std::endl;
             time_python_ += processingTime9.count();
 
             std::chrono::steady_clock::time_point stop7 = std::chrono::steady_clock::now();
             std::chrono::duration<double> processingTime7 = std::chrono::duration_cast<std::chrono::duration<double>>(stop7 - start7);
-            // std::cout << "DNNinferenceTime = " << processingTime7.count() << std::endl;
             time_DNNinference_ += processingTime7.count();
 
             /*=============================construct solutions=============================*/
             std::chrono::steady_clock::time_point start6 = std::chrono::steady_clock::now();
-            const int size = outputLength[0] * mixture_.nSpecies(); // sample_length * sample_number
-            // assert(size == result.size());
-            std::vector<double> outputsVec0(result.data(), result.data() + size);
             std::vector<std::vector<double>> results = {outputsVec0};
             updateSolutionBuffer(solutionBuffer, results, cellIDBuffer, problemCounter);
             std::chrono::steady_clock::time_point stop6 = std::chrono::steady_clock::now();
@@ -275,11 +258,8 @@ Foam::scalar Foam::dfChemistryModel<ThermoType>::solve_DNN(const DeltaTType &del
         std::vector<std::vector<label>> problemCounter; // evaluate the number of the problems of each subslave
         problemBuffer.append(GPUproblemList);
         getDNNinputs(problemBuffer, outputLength, DNNinputs, cellIDBuffer, problemCounter);
-        pybind11::array_t<double> vec0 = pybind11::array_t<double>({DNNinputs[0].size()}, {8}, &DNNinputs[0][0]); // cast vector to np.array
-        pybind11::module_ call_torch = pybind11::module_::import("inference"); // import python file
-        pybind11::object result = call_torch.attr("inference")(vec0); // call python function
-        const double* star = result.cast<pybind11::array_t<double>>().data();
-        std::vector<double> outputsVec0(star, star+outputLength[0] * mixture_.nSpecies()); //the float number is sample_length*sample_number
+        std::vector<double> outputsVec0 =
+            pytorchBackend_().inferFlat(DNNinputs[0], outputLength[0] * mixture_.nSpecies());
         std::vector<std::vector<double>> results = {outputsVec0};
         updateSolutionBuffer(solutionBuffer, results, cellIDBuffer, problemCounter);
         DynamicList<GpuSolution> finalList;

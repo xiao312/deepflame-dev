@@ -32,6 +32,7 @@ ${LB}/RecvBuffer.C
 ${LB}/algorithms_DLB.C
 ${LB}/runtime_assert.C
 ${LB}/LoadBalancer.C
+${workDir}/inference/PyTorchEmbeddedBackend.C
 ${workDir}/makeDfChemistryModels.C
 )
 add_library(dfChemistryModel SHARED ${SOURCES})

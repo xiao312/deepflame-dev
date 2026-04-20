@@ -7,6 +7,7 @@ loadBalancing/RecvBuffer.C
 loadBalancing/algorithms_DLB.C
 loadBalancing/runtime_assert.C
 loadBalancing/LoadBalancer.C
+inference/PyTorchEmbeddedBackend.C
 
 makeDfChemistryModels.C
 

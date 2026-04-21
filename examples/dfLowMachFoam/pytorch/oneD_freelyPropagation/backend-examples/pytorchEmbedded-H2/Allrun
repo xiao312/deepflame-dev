@@ -1,18 +1,7 @@
 #!/bin/sh
 cd ${0%/*} || exit 1
 
-if [ -e DNN_model.pt ]
-then
-    echo "DNN_model.pt exists. Make sure correct DNN model has been used!"
-else
-    if [ ! -e DNN_model.zip ]; then
-        echo "DNN_model.pt not found. Downloading DNN_model.zip ..."
-        wget https://store.aissquare.com/models/5e1232cd-c23f-489f-9db4-ee09592beeb1/DNN_model.zip || exit 1
-    fi
-    unzip -o DNN_model.zip || exit 1
-    cp ./DNN_model/H2/DNN_model.pt . || exit 1
-    cp ./DNN_model/H2/Burke2012_s9r23.yaml . || exit 1
-fi
+sh ../prepare_h2_model_assets.sh || exit 1
 
 . $WM_PROJECT_DIR/bin/tools/RunFunctions
 

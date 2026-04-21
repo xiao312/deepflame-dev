@@ -35,12 +35,7 @@ private:
     void ensureInitialized();
 
 public:
-    OnnxRuntimeBackend(
-        const fileName& modelPath,
-        const word& executionProvider = "cpu",
-        int intraOpThreads = 1,
-        int configuredInputFeatureSize = 0,
-        int deviceId = 0);
+    explicit OnnxRuntimeBackend(const InferenceBackendConfig& config);
 
     std::vector<double> inferFlat(
         const std::vector<double>& flatInput,

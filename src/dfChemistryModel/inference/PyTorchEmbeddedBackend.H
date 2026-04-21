@@ -26,7 +26,7 @@ private:
     void ensureInitialized();
 
 public:
-    explicit PyTorchEmbeddedBackend(const std::string& moduleName = "inference");
+    explicit PyTorchEmbeddedBackend(const InferenceBackendConfig& config);
 
     std::vector<double> inferFlat(
         const std::vector<double>& flatInput,

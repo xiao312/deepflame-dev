@@ -10,6 +10,7 @@ loadBalancing/LoadBalancer.C
 inference/InferenceBackend.C
 inference/PyTorchEmbeddedBackend.C
 inference/OnnxRuntimeBackend.C
+inference/TensorRtBackend.C
 
 makeDfChemistryModels.C
 

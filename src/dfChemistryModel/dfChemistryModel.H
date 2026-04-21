@@ -182,7 +182,11 @@ public IOdictionary
         word inferenceExecutionProvider_;
         label inferenceIntraOpThreads_;
         label inferenceInputFeatureSize_;
+        label inferenceOutputFeatureSize_;
         label inferenceDeviceId_;
+        word inferenceInputTensorName_;
+        word inferenceOutputTensorName_;
+        Switch inferenceUsePinnedHostMemory_;
         Switch inferenceCentralized_;
         autoPtr<InferenceBackend> inferenceBackend_;
 #endif

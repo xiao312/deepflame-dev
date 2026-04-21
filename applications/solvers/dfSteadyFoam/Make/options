@@ -1,6 +1,8 @@
 -include $(GENERAL_RULES)/mplibType
 
 ONNXRUNTIME_ROOT := $(shell printf %s "$$ONNXRUNTIME_ROOT")
+TENSORRT_LIBDIR := $(shell printf %s "$$TENSORRT_LIBDIR")
+CUDA_RUNTIME_LIBDIR := $(shell printf %s "$$CUDA_RUNTIME_LIBDIR")
 
 EXE_INC = -std=c++14 \
     -g \
@@ -12,6 +14,7 @@ EXE_INC = -std=c++14 \
     $(PFLAGS) $(PINC) \
     $(if $(LIBTORCH_ROOT),-DUSE_LIBTORCH,) \
     $(if $(PYTHON_INC_DIR),-DUSE_PYTORCH,) \
+    $(if $(TENSORRT_LIBDIR),-DUSE_TENSORRT,) \
     -I$(FOAM_APP)/solvers/lagrangian/reactingParcelFoam \
     -I$(FOAM_APP)/solvers/compressible/rhoSimpleFoam \
     -I$(LIB_SRC)/transportModels/compressible/lnInclude \
@@ -72,6 +75,8 @@ EXE_LIBS = \
     -ldfCombustionModels  \
     $(CANTERA_ROOT)/lib/libcantera.so \
     $(if $(ONNXRUNTIME_ROOT),-L$(ONNXRUNTIME_ROOT) -lonnxruntime,) \
+    $(if $(TENSORRT_LIBDIR),-L$(TENSORRT_LIBDIR) -lnvinfer,) \
+    $(if $(CUDA_RUNTIME_LIBDIR),-L$(CUDA_RUNTIME_LIBDIR) -lcudart,) \
     $(if $(LIBTORCH_ROOT),$(LIBTORCH_ROOT)/lib/libtorch.so,) \
     $(if $(LIBTORCH_ROOT),$(LIBTORCH_ROOT)/lib/libc10.so,) \
     $(if $(LIBTORCH_ROOT),-rdynamic,) \

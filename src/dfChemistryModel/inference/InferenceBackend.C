@@ -4,42 +4,40 @@
 
 #include "OnnxRuntimeBackend.H"
 #include "PyTorchEmbeddedBackend.H"
+#include "TensorRtBackend.H"
 #include "error.H"
 
 namespace Foam
 {
 
-autoPtr<InferenceBackend> InferenceBackend::New(
-    const word& backendType,
-    const fileName& moduleName,
-    const fileName& artifactPath,
-    const word& executionProvider,
-    int intraOpThreads,
-    int inputFeatureSize,
-    int deviceId)
+autoPtr<InferenceBackend> InferenceBackend::New(const InferenceBackendConfig& config)
 {
-    if (backendType == "pytorchEmbedded")
+    if (config.backendType == "pytorchEmbedded")
     {
-        return autoPtr<InferenceBackend>(new PyTorchEmbeddedBackend(moduleName));
+        return autoPtr<InferenceBackend>(new PyTorchEmbeddedBackend(config));
     }
 
-    if (backendType == "onnxRuntime")
+    if (config.backendType == "onnxRuntime")
     {
-        return autoPtr<InferenceBackend>
-        (
-            new OnnxRuntimeBackend(
-                artifactPath,
-                executionProvider,
-                intraOpThreads,
-                inputFeatureSize,
-                deviceId)
-        );
+        return autoPtr<InferenceBackend>(new OnnxRuntimeBackend(config));
+    }
+
+    if (config.backendType == "tensorRt")
+    {
+#ifdef USE_TENSORRT
+        return autoPtr<InferenceBackend>(new TensorRtBackend(config));
+#else
+        FatalErrorInFunction
+            << "backend=tensorRt was requested, but DeepFlame was built without TensorRT support. "
+            << "Re-run configure.sh with TensorRT available and rebuild."
+            << abort(FatalError);
+#endif
     }
 
     FatalErrorInFunction
-        << "Unsupported inference backend '" << backendType << "'. "
+        << "Unsupported inference backend '" << config.backendType << "'. "
         << "Configure TorchSettings.backend in constant/CanteraTorchProperties. "
-        << "Currently supported backends: pytorchEmbedded, onnxRuntime"
+        << "Currently supported backends: pytorchEmbedded, onnxRuntime, tensorRt"
         << abort(FatalError);
 
     return autoPtr<InferenceBackend>(nullptr);

@@ -199,13 +199,46 @@ Foam::dfChemistryModel<ThermoType>::dfChemistryModel
     time_python_ = 0;
     inferenceBackendType_ = this->subDict("TorchSettings").lookupOrDefault("backend", word("pytorchEmbedded"));
     inferenceBackendModule_ = this->subDict("TorchSettings").lookupOrDefault("backendModule", fileName("inference"));
-    inferenceBackendArtifact_ = this->subDict("TorchSettings").lookupOrDefault("onnxModel", fileName(""));
-    inferenceExecutionProvider_ = this->subDict("TorchSettings").lookupOrDefault("onnxExecutionProvider", word("cpu"));
-    inferenceIntraOpThreads_ = this->subDict("TorchSettings").lookupOrDefault("onnxIntraOpThreads", 1);
-    inferenceInputFeatureSize_ = this->subDict("TorchSettings").lookupOrDefault("onnxInputFeatureSize", 0);
-    inferenceDeviceId_ = this->subDict("TorchSettings").lookupOrDefault("onnxDeviceId", 0);
-    inferenceCentralized_ = this->subDict("TorchSettings").lookupOrDefault("onnxCentralized", true);
+    inferenceBackendArtifact_ = fileName("");
+    inferenceExecutionProvider_ = word("cpu");
+    inferenceIntraOpThreads_ = 1;
+    inferenceInputFeatureSize_ = 0;
+    inferenceOutputFeatureSize_ = 0;
+    inferenceDeviceId_ = 0;
+    inferenceInputTensorName_ = word("");
+    inferenceOutputTensorName_ = word("");
+    inferenceUsePinnedHostMemory_ = true;
+    inferenceCentralized_ = true;
     inferenceBackend_.clear();
+
+    if (inferenceBackendType_ == "onnxRuntime")
+    {
+        inferenceBackendArtifact_ = this->subDict("TorchSettings").lookupOrDefault("onnxModel", fileName(""));
+        inferenceExecutionProvider_ = this->subDict("TorchSettings").lookupOrDefault("onnxExecutionProvider", word("cpu"));
+        inferenceIntraOpThreads_ = this->subDict("TorchSettings").lookupOrDefault("onnxIntraOpThreads", 1);
+        inferenceInputFeatureSize_ = this->subDict("TorchSettings").lookupOrDefault("onnxInputFeatureSize", 0);
+        inferenceDeviceId_ = this->subDict("TorchSettings").lookupOrDefault("onnxDeviceId", 0);
+        inferenceCentralized_ = this->subDict("TorchSettings").lookupOrDefault("onnxCentralized", true);
+    }
+    else if (inferenceBackendType_ == "tensorRt")
+    {
+        inferenceBackendArtifact_ = this->subDict("TorchSettings").lookupOrDefault("trtEngine", fileName(""));
+        inferenceInputFeatureSize_ = this->subDict("TorchSettings").lookupOrDefault("trtInputFeatureSize", 0);
+        inferenceOutputFeatureSize_ = this->subDict("TorchSettings").lookupOrDefault("trtOutputFeatureSize", 0);
+        inferenceDeviceId_ = this->subDict("TorchSettings").lookupOrDefault("trtDeviceId", 0);
+        inferenceInputTensorName_ = this->subDict("TorchSettings").lookupOrDefault("trtInputTensorName", word(""));
+        inferenceOutputTensorName_ = this->subDict("TorchSettings").lookupOrDefault("trtOutputTensorName", word(""));
+        inferenceUsePinnedHostMemory_ = this->subDict("TorchSettings").lookupOrDefault("trtUsePinnedHostMemory", true);
+        inferenceCentralized_ = this->subDict("TorchSettings").lookupOrDefault("trtCentralized", true);
+        gpu_ = true;
+        if (!inferenceCentralized_)
+        {
+            FatalErrorInFunction
+                << "TensorRT backend currently supports only centralized inference. "
+                << "Set TorchSettings.trtCentralized true;"
+                << abort(FatalError);
+        }
+    }
 
     useThermoTranNN = this->lookupOrDefault("useThermoTranNN", false);
     if(useThermoTranNN)
@@ -217,18 +250,24 @@ Foam::dfChemistryModel<ThermoType>::dfChemistryModel
     if (torchSwitch_)
     {
         const bool createBackendNow =
-            inferenceBackendType_ != "onnxRuntime" || ownsInferenceWork();
+            !gpu_ || inferenceBackendType_ == "pytorchEmbedded" || ownsInferenceWork();
 
         if (createBackendNow)
         {
-            inferenceBackend_ = InferenceBackend::New(
-                inferenceBackendType_,
-                inferenceBackendModule_,
-                inferenceBackendArtifact_,
-                inferenceExecutionProvider_,
-                inferenceIntraOpThreads_,
-                inferenceInputFeatureSize_,
-                inferenceDeviceId_);
+            InferenceBackendConfig backendConfig;
+            backendConfig.backendType = inferenceBackendType_;
+            backendConfig.moduleName = inferenceBackendModule_;
+            backendConfig.artifactPath = inferenceBackendArtifact_;
+            backendConfig.executionProvider = inferenceExecutionProvider_;
+            backendConfig.intraOpThreads = inferenceIntraOpThreads_;
+            backendConfig.inputFeatureSize = inferenceInputFeatureSize_;
+            backendConfig.outputFeatureSize = inferenceOutputFeatureSize_;
+            backendConfig.deviceId = inferenceDeviceId_;
+            backendConfig.inputTensorName = inferenceInputTensorName_;
+            backendConfig.outputTensorName = inferenceOutputTensorName_;
+            backendConfig.usePinnedHostMemory = inferenceUsePinnedHostMemory_;
+
+            inferenceBackend_ = InferenceBackend::New(backendConfig);
 
             Info << nl << "Inference backend initialized: " << inferenceBackendType_;
             if (inferenceBackendType_ == "onnxRuntime")
@@ -236,6 +275,13 @@ Foam::dfChemistryModel<ThermoType>::dfChemistryModel
                 Info << " (model=" << inferenceBackendArtifact_
                      << ", provider=" << inferenceExecutionProvider_
                      << ", deviceId=" << inferenceDeviceId_
+                     << ", centralized=" << inferenceCentralized_ << ")";
+            }
+            else if (inferenceBackendType_ == "tensorRt")
+            {
+                Info << " (engine=" << inferenceBackendArtifact_
+                     << ", deviceId=" << inferenceDeviceId_
+                     << ", pinnedHostMemory=" << inferenceUsePinnedHostMemory_
                      << ", centralized=" << inferenceCentralized_ << ")";
             }
             else if (inferenceBackendType_ == "pytorchEmbedded")

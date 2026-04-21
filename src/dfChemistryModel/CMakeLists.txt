@@ -36,6 +36,7 @@ ${LB}/LoadBalancer.C
 ${workDir}/inference/InferenceBackend.C
 ${workDir}/inference/PyTorchEmbeddedBackend.C
 ${workDir}/inference/OnnxRuntimeBackend.C
+${workDir}/inference/TensorRtBackend.C
 ${workDir}/makeDfChemistryModels.C
 )
 add_library(dfChemistryModel SHARED ${SOURCES})
@@ -50,6 +51,11 @@ if(DEFINED ENV{PYTHON_INC_DIR})
   )
 endif()
 
+if(DEFINED ENV{TENSORRT_ROOT} AND NOT "$ENV{TENSORRT_ROOT}" STREQUAL "")
+  add_definitions(-DUSE_TENSORRT)
+  include_directories($ENV{TENSORRT_ROOT}/include)
+endif()
+
 
 
 
@@ -60,6 +66,10 @@ target_link_libraries(${PROJECT_NAME} ${OpenFOAM_LIB_DIR}/libcompressibleTranspo
 
 if(DEFINED ENV{ONNXRUNTIME_LIB} AND NOT "$ENV{ONNXRUNTIME_LIB}" STREQUAL "")
   target_link_libraries(${PROJECT_NAME} $ENV{ONNXRUNTIME_LIB})
+endif()
+
+if(DEFINED ENV{TENSORRT_LIBDIR} AND NOT "$ENV{TENSORRT_LIBDIR}" STREQUAL "")
+  target_link_libraries(${PROJECT_NAME} $ENV{TENSORRT_LIBDIR}/libnvinfer.so cudart)
 endif()
 
 target_link_libraries(${PROJECT_NAME} ${CANTERA_ROOT}/lib/libcantera.so.2)

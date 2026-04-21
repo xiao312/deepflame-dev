@@ -13,19 +13,42 @@
 namespace Foam
 {
 
+struct InferenceBackendConfig
+{
+    word backendType;
+    fileName moduleName;
+    fileName artifactPath;
+    word executionProvider;
+    int intraOpThreads;
+    int inputFeatureSize;
+    int outputFeatureSize;
+    int deviceId;
+    word inputTensorName;
+    word outputTensorName;
+    bool usePinnedHostMemory;
+
+    InferenceBackendConfig()
+    :
+        backendType("pytorchEmbedded"),
+        moduleName("inference"),
+        artifactPath(""),
+        executionProvider("cpu"),
+        intraOpThreads(1),
+        inputFeatureSize(0),
+        outputFeatureSize(0),
+        deviceId(0),
+        inputTensorName(""),
+        outputTensorName(""),
+        usePinnedHostMemory(true)
+    {}
+};
+
 class InferenceBackend
 {
 public:
     virtual ~InferenceBackend() = default;
 
-    static autoPtr<InferenceBackend> New(
-        const word& backendType,
-        const fileName& moduleName,
-        const fileName& artifactPath,
-        const word& executionProvider,
-        int intraOpThreads,
-        int inputFeatureSize,
-        int deviceId);
+    static autoPtr<InferenceBackend> New(const InferenceBackendConfig& config);
 
     virtual std::vector<double> inferFlat(
         const std::vector<double>& flatInput,

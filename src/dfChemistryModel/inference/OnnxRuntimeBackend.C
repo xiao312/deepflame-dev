@@ -45,18 +45,13 @@ Ort::Env& globalOnnxEnv(const int intraOpThreads)
 namespace Foam
 {
 
-OnnxRuntimeBackend::OnnxRuntimeBackend(
-    const fileName& modelPath,
-    const word& executionProvider,
-    int intraOpThreads,
-    int configuredInputFeatureSize,
-    int deviceId)
+OnnxRuntimeBackend::OnnxRuntimeBackend(const InferenceBackendConfig& config)
 :
-    modelPath_(modelPath),
-    executionProvider_(executionProvider),
-    intraOpThreads_(intraOpThreads),
-    configuredInputFeatureSize_(configuredInputFeatureSize),
-    deviceId_(deviceId),
+    modelPath_(config.artifactPath),
+    executionProvider_(config.executionProvider),
+    intraOpThreads_(config.intraOpThreads),
+    configuredInputFeatureSize_(config.inputFeatureSize),
+    deviceId_(config.deviceId),
     session_(nullptr),
     ioBinding_(nullptr),
     inputFeatureSize_(0),

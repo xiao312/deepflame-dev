@@ -12,10 +12,17 @@ unset AMGX_DIR
 unset ODE_GPU_SOLVER
 unset ONNXRUNTIME_DIR
 unset ONNXRUNTIME_LIB
+unset TENSORRT_DIR
+unset TENSORRT_LIBDIR
+unset CUDA_RUNTIME_INCLUDE
+unset CUDA_NVCC_INCLUDE
+unset CUDA_CCCL_INCLUDE
+unset CUDA_RUNTIME_LIBDIR
+unset NVIDIA_CUDA_LIB_DIRS
 
 print_usage() {
     echo "Usage: . install.sh --libtorch_no (default) | --libtorch_dir _path_to_libtorch | --libtorch_autodownload | --use_pytorch | --libcantera_dir _path_to_libcantera
-        | --amgx_dir _path_to_amgx | --use_ode_gpu_solver"
+        | --tensorrt_dir _path_to_tensorrt | --amgx_dir _path_to_amgx | --use_ode_gpu_solver"
 }
 
 # default
@@ -62,6 +69,16 @@ while test $# -gt 0; do
             shift
             if test $# -gt 0; then
                 LIBCANTERA_DIR=$1
+            else
+                print_usage
+            return
+            fi
+            shift
+            ;;
+        --tensorrt_dir)
+            shift
+            if test $# -gt 0; then
+                TENSORRT_DIR=$1
             else
                 print_usage
             return
@@ -146,6 +163,18 @@ if [ $LIBTORCH_AUTO = true ]; then
 fi
 
 
+if [ -z "$TENSORRT_DIR" ] && [ ! -z "$TENSORRT_ROOT" ]; then
+    TENSORRT_DIR=$TENSORRT_ROOT
+fi
+
+if [ ! -z "$TENSORRT_DIR" ]; then
+    if [ -d "$TENSORRT_DIR/lib64" ]; then
+        TENSORRT_LIBDIR=$TENSORRT_DIR/lib64
+    elif [ -d "$TENSORRT_DIR/lib" ]; then
+        TENSORRT_LIBDIR=$TENSORRT_DIR/lib
+    fi
+fi
+
 if [ $USE_PYTORCH = true ]; then
     PYTORCH_INC=`python3 -m pybind11 --includes`
     if [ -z "$PYTORCH_INC" ]; then
@@ -178,6 +207,37 @@ PY`
             ln -sf `basename "$ONNXRUNTIME_LIB"` "$ONNXRUNTIME_DIR/libonnxruntime.so.1"
         fi
     fi
+
+    CUDA_RUNTIME_INCLUDE=`python3 - <<'PY'
+import pathlib,sys
+p = pathlib.Path(sys.prefix) / 'lib/python3.8/site-packages/nvidia/cuda_runtime/include'
+print(p if p.exists() else '')
+PY`
+    CUDA_NVCC_INCLUDE=`python3 - <<'PY'
+import pathlib,sys
+p = pathlib.Path(sys.prefix) / 'lib/python3.8/site-packages/nvidia/cuda_nvcc/include'
+print(p if p.exists() else '')
+PY`
+    CUDA_CCCL_INCLUDE=`python3 - <<'PY'
+import pathlib,sys
+p = pathlib.Path(sys.prefix) / 'lib/python3.8/site-packages/nvidia/cuda_cccl/include'
+print(p if p.exists() else '')
+PY`
+    CUDA_RUNTIME_LIBDIR=`python3 - <<'PY'
+import pathlib,sys
+p = pathlib.Path(sys.prefix) / 'lib/python3.8/site-packages/nvidia/cuda_runtime/lib'
+print(p if p.exists() else '')
+PY`
+    NVIDIA_CUDA_LIB_DIRS=`python3 - <<'PY'
+import pathlib,sys
+base = pathlib.Path(sys.prefix) / 'lib/python3.8/site-packages/nvidia'
+parts=[]
+for name in ['cuda_runtime/lib','cublas/lib','cudnn/lib','cufft/lib','curand/lib','cuda_nvrtc/lib','nvjitlink/lib']:
+    p = base / name
+    if p.exists():
+        parts.append(str(p))
+print(':'.join(parts))
+PY`
 fi
 
 
@@ -194,6 +254,13 @@ if [ $USE_PYTORCH = true ]; then
     echo PYTORCH_LIB=$PYTORCH_LIB
     echo ONNXRUNTIME_DIR=$ONNXRUNTIME_DIR
     echo ONNXRUNTIME_LIB=$ONNXRUNTIME_LIB
+    echo TENSORRT_DIR=$TENSORRT_DIR
+    echo TENSORRT_LIBDIR=$TENSORRT_LIBDIR
+    echo CUDA_RUNTIME_INCLUDE=$CUDA_RUNTIME_INCLUDE
+    echo CUDA_NVCC_INCLUDE=$CUDA_NVCC_INCLUDE
+    echo CUDA_CCCL_INCLUDE=$CUDA_CCCL_INCLUDE
+    echo CUDA_RUNTIME_LIBDIR=$CUDA_RUNTIME_LIBDIR
+    echo NVIDIA_CUDA_LIB_DIRS=$NVIDIA_CUDA_LIB_DIRS
     echo LIBTORCH_DIR=""
 fi
 if [ $USE_GPUSOLVER = true ]; then
@@ -211,6 +278,13 @@ sed -i "s#PYTORCH_LIB#$PYTORCH_LIB#g" ./bashrc
 sed -i "s#LIBCANTERA_DIR#$LIBCANTERA_DIR#g" ./bashrc
 sed -i "s#@ONNXRUNTIME_DIR@#$ONNXRUNTIME_DIR#g" ./bashrc
 sed -i "s#@ONNXRUNTIME_LIB@#$ONNXRUNTIME_LIB#g" ./bashrc
+sed -i "s#@TENSORRT_DIR@#$TENSORRT_DIR#g" ./bashrc
+sed -i "s#@TENSORRT_LIBDIR@#$TENSORRT_LIBDIR#g" ./bashrc
+sed -i "s#@CUDA_RUNTIME_INCLUDE@#$CUDA_RUNTIME_INCLUDE#g" ./bashrc
+sed -i "s#@CUDA_NVCC_INCLUDE@#$CUDA_NVCC_INCLUDE#g" ./bashrc
+sed -i "s#@CUDA_CCCL_INCLUDE@#$CUDA_CCCL_INCLUDE#g" ./bashrc
+sed -i "s#@CUDA_RUNTIME_LIBDIR@#$CUDA_RUNTIME_LIBDIR#g" ./bashrc
+sed -i "s#@NVIDIA_CUDA_LIB_DIRS@#$NVIDIA_CUDA_LIB_DIRS#g" ./bashrc
 sed -i "s#@AMGX_DIR@#$AMGX_DIR#g" ./bashrc
 sed -i "s#@ODE_GPU_SOLVER@#$OPENCC_PATH#g" ./bashrc
 

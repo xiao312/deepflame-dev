@@ -9,10 +9,10 @@
 namespace Foam
 {
 
-PyTorchEmbeddedBackend::PyTorchEmbeddedBackend(const std::string& moduleName)
+PyTorchEmbeddedBackend::PyTorchEmbeddedBackend(const InferenceBackendConfig& config)
 :
     initialized_(false),
-    moduleName_(moduleName)
+    moduleName_(config.moduleName)
 {}
 
 void PyTorchEmbeddedBackend::ensureInitialized()

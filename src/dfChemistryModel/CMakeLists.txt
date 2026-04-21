@@ -34,6 +34,7 @@ ${LB}/algorithms_DLB.C
 ${LB}/runtime_assert.C
 ${LB}/LoadBalancer.C
 ${workDir}/inference/InferenceBackend.C
+${workDir}/inference/InferenceRuntimeConfig.C
 ${workDir}/inference/PyTorchEmbeddedBackend.C
 ${workDir}/inference/OnnxRuntimeBackend.C
 ${workDir}/inference/TensorRtBackend.C

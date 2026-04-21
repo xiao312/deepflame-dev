@@ -55,6 +55,7 @@ SourceFiles
 #include "GpuSolution.H"
 #include "DynamicBuffer.H"
 #include "InferenceBackend.H"
+#include "InferenceRuntimeConfig.H"
 #endif
 
 #include "CanteraMixture.H"
@@ -259,8 +260,6 @@ public IOdictionary
                 inferenceBackendType_ == "onnxRuntime" && !inferenceCentralized_;
             return !gpu_ || distributedOnnx || !(Pstream::myProcNo() % cores_);
         }
-
-        void validateInferenceBackendConfig();
 
         /*============= private methods in solve_DNN =============*/
         //- get a list of GPU problems to be solved

@@ -8,6 +8,7 @@ loadBalancing/algorithms_DLB.C
 loadBalancing/runtime_assert.C
 loadBalancing/LoadBalancer.C
 inference/InferenceBackend.C
+inference/InferenceRuntimeConfig.C
 inference/PyTorchEmbeddedBackend.C
 inference/OnnxRuntimeBackend.C
 inference/TensorRtBackend.C

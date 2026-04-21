@@ -35,7 +35,7 @@ TorchSettings
 {
     torch             on;
     GPU               on;
-    log               on;
+    log               false;
     torchModel        "DNN_model.pt"; 
     frozenTemperature 510;
     inferenceDeltaTime 1e-6;

@@ -48,6 +48,7 @@ TensorRtBackend::TensorRtBackend(const InferenceBackendConfig& config)
     configuredInputFeatureSize_(config.inputFeatureSize),
     configuredOutputFeatureSize_(config.outputFeatureSize),
     deviceId_(config.deviceId),
+    verbose_(config.verbose),
     configuredInputTensorName_(config.inputTensorName),
     configuredOutputTensorName_(config.outputTensorName),
     usePinnedHostMemory_(config.usePinnedHostMemory),
@@ -122,6 +123,9 @@ void TensorRtBackend::freeBuffers()
     batchCapacity_ = 0;
 }
 
+// Resize persistent host/device staging buffers when the current batch does
+// not fit. TensorRT keeps tensor bindings by pointer, so rebinding happens here
+// after any reallocation.
 void TensorRtBackend::ensureCapacity(const std::size_t batchSize)
 {
     if (batchSize <= batchCapacity_)
@@ -233,6 +237,8 @@ void TensorRtBackend::ensureInitialized()
             << abort(FatalError);
     }
 
+    // TensorRT executes a pre-built serialized engine. Engine generation stays
+    // outside the solver so production runs do not pay build-time costs.
     std::ifstream engineFile(enginePath_.c_str(), std::ios::binary);
     if (!engineFile)
     {
@@ -369,15 +375,18 @@ void TensorRtBackend::ensureInitialized()
             << abort(FatalError);
     }
 
-    Info << "[TRT DEBUG] initialized"
-         << " engine=" << enginePath_
-         << " inputTensor=" << inputName_
-         << " outputTensor=" << outputName_
-         << " inputFeatureSize=" << inputFeatureSize_
-         << " outputFeatureSize=" << outputFeatureSize_
-         << " deviceId=" << deviceId_
-         << " pinnedHostMemory=" << usePinnedHostMemory_
-         << Foam::nl << Foam::endl;
+    if (verbose_)
+    {
+        Info << "[TRT DEBUG] initialized"
+             << " engine=" << enginePath_
+             << " inputTensor=" << inputName_
+             << " outputTensor=" << outputName_
+             << " inputFeatureSize=" << inputFeatureSize_
+             << " outputFeatureSize=" << outputFeatureSize_
+             << " deviceId=" << deviceId_
+             << " pinnedHostMemory=" << usePinnedHostMemory_
+             << Foam::nl << Foam::endl;
+    }
 #endif
 }
 
@@ -511,18 +520,21 @@ std::vector<double> TensorRtBackend::inferFlat(
     cumulativeCopyTime += copyTime;
     cumulativeTotalTime += totalTime;
 
-    Foam::Info << "[TRT TIMING] call=" << callCount
-               << " batchSize=" << batchSize
-               << " inputSize=" << flatInput.size()
-               << " outputSize=" << outputSize
-               << " convert=" << convertTime
-               << " h2d=" << h2dTime
-               << " run=" << runTime
-               << " d2h=" << d2hTime
-               << " copy=" << copyTime
-               << " total=" << totalTime
-               << " cumulativeTotal=" << cumulativeTotalTime
-               << Foam::nl << Foam::endl;
+    if (verbose_)
+    {
+        Foam::Info << "[TRT TIMING] call=" << callCount
+                   << " batchSize=" << batchSize
+                   << " inputSize=" << flatInput.size()
+                   << " outputSize=" << outputSize
+                   << " convert=" << convertTime
+                   << " h2d=" << h2dTime
+                   << " run=" << runTime
+                   << " d2h=" << d2hTime
+                   << " copy=" << copyTime
+                   << " total=" << totalTime
+                   << " cumulativeTotal=" << cumulativeTotalTime
+                   << Foam::nl << Foam::endl;
+    }
 
     return result;
 #endif

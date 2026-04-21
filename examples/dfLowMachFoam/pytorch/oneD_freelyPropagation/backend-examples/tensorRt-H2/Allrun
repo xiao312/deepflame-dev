@@ -1,0 +1,33 @@
+#!/bin/sh
+cd ${0%/*} || exit 1
+
+if [ -e DNN_model.pt ]
+then
+    echo "DNN_model.pt exists. Make sure correct DNN model has been used!"
+else
+    if [ ! -e DNN_model.zip ]; then
+        echo "DNN_model.pt not found. Downloading DNN_model.zip ..."
+        wget https://store.aissquare.com/models/5e1232cd-c23f-489f-9db4-ee09592beeb1/DNN_model.zip || exit 1
+    fi
+    unzip -o DNN_model.zip || exit 1
+    cp ./DNN_model/H2/DNN_model.pt . || exit 1
+    cp ./DNN_model/H2/Burke2012_s9r23.yaml . || exit 1
+fi
+
+if [ ! -f h2_full_inference_wrapper.onnx ]; then
+    echo "ONNX wrapper not found. Building h2_full_inference_wrapper.onnx ..."
+    python3 ./build_h2_onnx_wrapper.py . ./h2_full_inference_wrapper.onnx || exit 1
+fi
+
+if [ ! -f h2_full_inference_wrapper_fp32.plan ]; then
+    echo "TensorRT engine not found. Building h2_full_inference_wrapper_fp32.plan ..."
+    ./build_h2_tensorrt_engine.sh || exit 1
+fi
+
+. $WM_PROJECT_DIR/bin/tools/RunFunctions
+
+application=dfLowMachFoam
+
+runApplication blockMesh
+runApplication decomposePar -force
+runApplication mpirun -np 4 --allow-run-as-root $application -parallel

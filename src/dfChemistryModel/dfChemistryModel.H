@@ -170,12 +170,13 @@ public IOdictionary
 #endif
 
 #ifdef USE_PYTORCH
-        int cores_; // The number of cores per node when use pytorch
+        int cores_; // The number of ranks per inference group in USE_PYTORCH mode
 
         // profiling
         double time_vec2ndarray_;
         double time_python_;
         pybind11::module_ call_ThermoTranNN; // to import inference file
+        // Runtime-selectable backend configuration read from TorchSettings.
         word inferenceBackendType_;
         fileName inferenceBackendModule_;
         fileName inferenceBackendArtifact_;
@@ -249,12 +250,17 @@ public IOdictionary
         }
 
 #if defined USE_LIBTORCH || defined USE_PYTORCH
+        // Only one rank per inference group owns centralized backend execution.
+        // Non-owner ranks forward their DNN work to the owning rank and must not
+        // construct backend runtime state for centralized ONNX/TensorRT modes.
         bool ownsInferenceWork() const
         {
             const bool distributedOnnx =
                 inferenceBackendType_ == "onnxRuntime" && !inferenceCentralized_;
             return !gpu_ || distributedOnnx || !(Pstream::myProcNo() % cores_);
         }
+
+        void validateInferenceBackendConfig();
 
         /*============= private methods in solve_DNN =============*/
         //- get a list of GPU problems to be solved

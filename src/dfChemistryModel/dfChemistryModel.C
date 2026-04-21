@@ -28,6 +28,122 @@ License
 #include "clockTime.H"
 #include "runtime_assert.H"
 
+#ifdef USE_PYTORCH
+
+template<class ThermoType>
+void Foam::dfChemistryModel<ThermoType>::validateInferenceBackendConfig()
+{
+    if (inferenceBackendType_ == "pytorchEmbedded")
+    {
+        if (inferenceBackendModule_.empty())
+        {
+            FatalErrorInFunction
+                << "TorchSettings.backendModule must name the Python module used by "
+                << "backend=pytorchEmbedded. Example: backendModule \"inference\";"
+                << abort(FatalError);
+        }
+        return;
+    }
+
+    if (inferenceBackendType_ == "onnxRuntime")
+    {
+        if (inferenceBackendArtifact_.empty())
+        {
+            FatalErrorInFunction
+                << "TorchSettings.onnxModel must be set when backend=onnxRuntime. "
+                << "Example: onnxModel \"h2_full_inference_wrapper.onnx\";"
+                << abort(FatalError);
+        }
+        if (inferenceExecutionProvider_ != "cpu" && inferenceExecutionProvider_ != "cuda")
+        {
+            FatalErrorInFunction
+                << "TorchSettings.onnxExecutionProvider has unsupported value '"
+                << inferenceExecutionProvider_ << "'. Valid values: cpu, cuda"
+                << abort(FatalError);
+        }
+        if (inferenceIntraOpThreads_ < 1)
+        {
+            FatalErrorInFunction
+                << "TorchSettings.onnxIntraOpThreads must be >= 1. Got "
+                << inferenceIntraOpThreads_
+                << abort(FatalError);
+        }
+        if (inferenceDeviceId_ < 0)
+        {
+            FatalErrorInFunction
+                << "TorchSettings.onnxDeviceId must be >= 0. Got "
+                << inferenceDeviceId_
+                << abort(FatalError);
+        }
+        if (inferenceExecutionProvider_ == "cuda" && !gpu_)
+        {
+            FatalErrorInFunction
+                << "TorchSettings.GPU must be true when backend=onnxRuntime and "
+                << "onnxExecutionProvider=cuda."
+                << abort(FatalError);
+        }
+        return;
+    }
+
+    if (inferenceBackendType_ == "tensorRt")
+    {
+        if (inferenceBackendArtifact_.empty())
+        {
+            FatalErrorInFunction
+                << "TorchSettings.trtEngine must be set when backend=tensorRt. "
+                << "Example: trtEngine \"h2_full_inference_wrapper_fp32.plan\";"
+                << abort(FatalError);
+        }
+        if (inferenceInputFeatureSize_ <= 0)
+        {
+            FatalErrorInFunction
+                << "TorchSettings.trtInputFeatureSize must be > 0 when backend=tensorRt."
+                << abort(FatalError);
+        }
+        if (inferenceOutputFeatureSize_ <= 0)
+        {
+            FatalErrorInFunction
+                << "TorchSettings.trtOutputFeatureSize must be > 0 when backend=tensorRt."
+                << abort(FatalError);
+        }
+        if (inferenceInputTensorName_.empty() || inferenceOutputTensorName_.empty())
+        {
+            FatalErrorInFunction
+                << "TorchSettings.trtInputTensorName and TorchSettings.trtOutputTensorName "
+                << "must both be set when backend=tensorRt."
+                << abort(FatalError);
+        }
+        if (inferenceDeviceId_ < 0)
+        {
+            FatalErrorInFunction
+                << "TorchSettings.trtDeviceId must be >= 0. Got "
+                << inferenceDeviceId_
+                << abort(FatalError);
+        }
+        if (!inferenceCentralized_)
+        {
+            FatalErrorInFunction
+                << "TensorRT backend currently supports only centralized inference. "
+                << "Set TorchSettings.trtCentralized true;"
+                << abort(FatalError);
+        }
+#ifndef USE_TENSORRT
+        FatalErrorInFunction
+            << "TorchSettings.backend=tensorRt was requested, but this DeepFlame build "
+            << "does not include TensorRT support. Re-run configure.sh with --tensorrt_dir "
+            << "or TENSORRT_ROOT set, then rebuild."
+            << abort(FatalError);
+#endif
+        return;
+    }
+
+    FatalErrorInFunction
+        << "TorchSettings.backend has unsupported value '" << inferenceBackendType_
+        << "'. Valid values: pytorchEmbedded, onnxRuntime, tensorRt"
+        << abort(FatalError);
+}
+
+#endif
 
 // * * * * * * * * * * * * * * * * Constructors  * * * * * * * * * * * * * * //
 
@@ -231,13 +347,6 @@ Foam::dfChemistryModel<ThermoType>::dfChemistryModel
         inferenceUsePinnedHostMemory_ = this->subDict("TorchSettings").lookupOrDefault("trtUsePinnedHostMemory", true);
         inferenceCentralized_ = this->subDict("TorchSettings").lookupOrDefault("trtCentralized", true);
         gpu_ = true;
-        if (!inferenceCentralized_)
-        {
-            FatalErrorInFunction
-                << "TensorRT backend currently supports only centralized inference. "
-                << "Set TorchSettings.trtCentralized true;"
-                << abort(FatalError);
-        }
     }
 
     useThermoTranNN = this->lookupOrDefault("useThermoTranNN", false);
@@ -249,6 +358,8 @@ Foam::dfChemistryModel<ThermoType>::dfChemistryModel
 
     if (torchSwitch_)
     {
+        validateInferenceBackendConfig();
+
         const bool createBackendNow =
             !gpu_ || inferenceBackendType_ == "pytorchEmbedded" || ownsInferenceWork();
 
@@ -266,7 +377,12 @@ Foam::dfChemistryModel<ThermoType>::dfChemistryModel
             backendConfig.inputTensorName = inferenceInputTensorName_;
             backendConfig.outputTensorName = inferenceOutputTensorName_;
             backendConfig.usePinnedHostMemory = inferenceUsePinnedHostMemory_;
+            backendConfig.verbose = gpulog_;
 
+            // The backend only owns runtime execution (Python embedding, ORT,
+            // TensorRT). Case-specific tensor packing/unpacking remains in the
+            // solver path so the CFD-facing contract stays stable across
+            // backends.
             inferenceBackend_ = InferenceBackend::New(backendConfig);
 
             Info << nl << "Inference backend initialized: " << inferenceBackendType_;
@@ -292,9 +408,12 @@ Foam::dfChemistryModel<ThermoType>::dfChemistryModel
         }
         else
         {
-            Info << nl
-                 << "Inference backend deferred on non-owner rank: "
-                 << inferenceBackendType_ << nl << endl;
+            if (gpulog_)
+            {
+                Info << nl
+                     << "Inference backend deferred on non-owner rank: "
+                     << inferenceBackendType_ << nl << endl;
+            }
         }
     }
 

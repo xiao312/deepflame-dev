@@ -1,0 +1,97 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+  =========                 |
+  \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox
+   \\    /   O peration     | Website:  https://openfoam.org
+    \\  /    A nd           | Version:  7
+     \\/     M anipulation  |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version          2.0;
+    format           ascii;
+    class            dictionary;
+    location         "constant";
+    object           CanteraTorchProperties;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+// Master switch for chemistry integration.
+chemistry            on;
+
+// Mechanism used by both Cantera-side chemistry bookkeeping and the exported
+// ONNX wrapper's pre/post-processing assumptions.
+CanteraMechanismFile "Burke2012_s9r23.yaml";
+
+transportModel       "Mix";
+
+// CVODE tolerances for the CPU chemistry path that still exists alongside DNN
+// inference in this case.
+odeCoeffs
+{
+    "relTol"         1e-6;
+    "absTol"         1e-10;
+}
+
+inertSpecie          "N2";
+splittingStrategy    off;
+
+TorchSettings
+{
+    // Enable DNN-based chemistry.
+    torch             on;
+
+    // Keep GPU routing enabled because this example is validated for ONNX
+    // Runtime CUDA execution in the current local environment.
+    GPU               on;
+
+    // Set true to print backend initialization and per-call timing logs.
+    log               false;
+
+    // Kept for consistency with the original H2 case payload.
+    torchModel        "DNN_model.pt";
+
+    // Select the compiled ONNX Runtime backend.
+    backend           onnxRuntime;
+
+    // Path to the exported full-wrapper ONNX model. Keep the ONNX file in this
+    // case directory or update the path accordingly.
+    onnxModel         "h2_full_inference_wrapper.onnx";
+
+    // Execution provider used by ONNX Runtime. Valid values currently supported
+    // by DeepFlame are:
+    //   cpu | cuda
+    // Use cuda for the local GPU-validated path.
+    onnxExecutionProvider cuda;
+
+    // Conservative intra-op threading is recommended under MPI to avoid CPU
+    // oversubscription.
+    onnxIntraOpThreads 1;
+
+    // Input feature count per cell. Keep this set when using the current H2
+    // wrapper so runtime metadata lookup is not required.
+    onnxInputFeatureSize 12;
+
+    // CUDA device used by ONNX Runtime when onnxExecutionProvider=cuda.
+    onnxDeviceId      0;
+
+    // Keep ONNX execution centralized so only the inference-owning rank creates
+    // the ONNX Runtime session. This matches the current DeepFlame serving
+    // design and the validated MPI runs.
+    onnxCentralized   true;
+
+    frozenTemperature 510;
+    inferenceDeltaTime 1e-6;
+
+    // Number of ranks grouped under one inference-owning rank.
+    coresPerNode      4;
+}
+
+loadbalancing
+{
+    active           true;
+    log              false;
+    algorithm        allAverage;//headTail;
+}
+
+
+// ************************************************************************* //

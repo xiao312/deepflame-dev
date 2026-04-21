@@ -118,7 +118,10 @@ Foam::scalar Foam::dfChemistryModel<ThermoType>::solve_DNN(const DeltaTType &del
             // std::cout << "getDNNinputsTime = " << processingTime5.count() << std::endl;
             time_getDNNinputs_ += processingTime5.count();
 
-            /*=============================inference via pybind11=============================*/
+            /*=============================backend inference=============================*/
+            // The owning rank translates gathered CFD state into one flat batch
+            // and dispatches it through the configured backend. The backend does
+            // not know about MPI routing or chemistry bookkeeping.
             std::chrono::steady_clock::time_point start7 = std::chrono::steady_clock::now();
             std::chrono::steady_clock::time_point start8 = std::chrono::steady_clock::now();
 
@@ -127,6 +130,7 @@ Foam::scalar Foam::dfChemistryModel<ThermoType>::solve_DNN(const DeltaTType &del
             // kept for backward-compatible profiling bucket name
             time_vec2ndarray_ += processingTime8.count();
 
+            // Centralized backends should exist only on inference-owning ranks.
             if (!inferenceBackend_.valid())
             {
                 FatalErrorInFunction

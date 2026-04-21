@@ -1,0 +1,94 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+  =========                 |
+  \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox
+   \\    /   O peration     | Website:  https://openfoam.org
+    \\  /    A nd           | Version:  7
+     \\/     M anipulation  |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version          2.0;
+    format           ascii;
+    class            dictionary;
+    location         "constant";
+    object           CanteraTorchProperties;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+// Master switch for chemistry integration. Keep this on for all three backend
+// examples because the DNN backends replace chemistry source-term evaluation,
+// not the rest of the reacting-flow model.
+chemistry            on;
+
+// Gas mechanism file used by the case and by the DNN wrapper/pre-post logic.
+// Set this to the mechanism matching the trained model and the case setup.
+CanteraMechanismFile "Burke2012_s9r23.yaml";
+
+// Standard transport model used by this tutorial case.
+transportModel       "Mix";
+
+// CVODE tolerances used for the cells that still go through the CPU chemistry
+// path. These are not backend-specific, but they remain part of the overall
+// chemistry configuration and should stay consistent across backend comparisons.
+odeCoeffs
+{
+    "relTol"         1e-6;
+    "absTol"         1e-10;
+}
+
+// Species treated as inert by the base case setup.
+inertSpecie          "N2";
+
+// Keep operator splitting off to match the validated H2 example behavior.
+splittingStrategy    off;
+
+TorchSettings
+{
+    // Global switch enabling the DNN-based chemistry path.
+    torch             on;
+
+    // Tells DeepFlame to use the GPU-oriented DNN routing topology. For the
+    // current backend design, ONNX Runtime CUDA and TensorRT both expect this on.
+    GPU               on;
+
+    // Backend debug/timing verbosity. Keep false for normal runs; set true when
+    // debugging backend initialization, timing, or artifact loading.
+    log               false;
+
+    // Original PyTorch model checkpoint kept here for parity/reference. The
+    // embedded-Python backend still uses the case's Python module as the serving
+    // entry point, so this file remains part of the case payload.
+    torchModel        "DNN_model.pt";
+
+    // Runtime-selectable inference backend. Valid values are:
+    //   pytorchEmbedded | onnxRuntime | tensorRt
+    // This case demonstrates the embedded-Python path.
+    backend           pytorchEmbedded;
+
+    // Python module imported by the embedded-Python backend. The module must be
+    // importable from the case directory and expose an inference(...) function.
+    backendModule     "inference";
+
+    // Existing H2 serving controls used by the current inference.py workflow.
+    // Keep them aligned with the model/export assumptions.
+    frozenTemperature 510;
+    inferenceDeltaTime 1e-6;
+
+    // Number of MPI ranks grouped under one inference-owning rank. This should
+    // match the tested case decomposition unless you intentionally retune the
+    // serving topology.
+    coresPerNode      4;
+}
+
+loadbalancing
+{
+    // Existing CPU-chemistry load balancer. This does not currently control DNN
+    // inference routing, but it still affects the CVODE part of the chemistry
+    // workload in mixed DNN/CVODE runs.
+    active           true;
+    log              false;
+    algorithm        allAverage;//headTail;
+}
+
+
+// ************************************************************************* //

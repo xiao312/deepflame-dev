@@ -20,6 +20,7 @@ class PyTorchEmbeddedBackend
 {
 private:
     bool initialized_;
+    bool verbose_;
     std::string moduleName_;
     pybind11::module_ module_;
 

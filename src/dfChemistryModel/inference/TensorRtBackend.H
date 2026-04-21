@@ -27,6 +27,7 @@ private:
     int configuredInputFeatureSize_;
     int configuredOutputFeatureSize_;
     int deviceId_;
+    bool verbose_;
     word configuredInputTensorName_;
     word configuredOutputTensorName_;
     bool usePinnedHostMemory_;

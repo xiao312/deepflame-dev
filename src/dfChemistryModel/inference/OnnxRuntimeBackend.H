@@ -23,6 +23,7 @@ private:
     int intraOpThreads_;
     int configuredInputFeatureSize_;
     int deviceId_;
+    bool verbose_;
 
     std::unique_ptr<Ort::Session> session_;
     std::unique_ptr<Ort::IoBinding> ioBinding_;
@@ -31,7 +32,6 @@ private:
     std::string inputName_;
     std::string outputName_;
 
-    static Ort::Env& processGlobalEnv(int intraOpThreads);
     void ensureInitialized();
 
 public:

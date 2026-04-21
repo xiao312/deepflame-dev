@@ -12,6 +12,7 @@ namespace Foam
 PyTorchEmbeddedBackend::PyTorchEmbeddedBackend(const InferenceBackendConfig& config)
 :
     initialized_(false),
+    verbose_(config.verbose),
     moduleName_(config.moduleName)
 {}
 
@@ -24,8 +25,11 @@ void PyTorchEmbeddedBackend::ensureInitialized()
         initialized_ = true;
         const auto stop = std::chrono::steady_clock::now();
         const double dt = std::chrono::duration_cast<std::chrono::duration<double>>(stop - start).count();
-        Foam::Info << "[PYBIND TIMING] module import module=" << moduleName_
-                   << " seconds=" << dt << Foam::nl << Foam::endl;
+        if (verbose_)
+        {
+            Foam::Info << "[PYBIND TIMING] module import module=" << moduleName_
+                       << " seconds=" << dt << Foam::nl << Foam::endl;
+        }
     }
 }
 
@@ -79,15 +83,18 @@ std::vector<double> PyTorchEmbeddedBackend::inferFlat(
     cumulativeCopyTime += copyTime;
     cumulativeTotalTime += totalTime;
 
-    Foam::Info << "[PYBIND TIMING] call=" << callCount
-               << " inputSize=" << flatInput.size()
-               << " outputSize=" << outputSize
-               << " array=" << arrayTime
-               << " pythonCall=" << pythonCallTime
-               << " copy=" << copyTime
-               << " total=" << totalTime
-               << " cumulativeTotal=" << cumulativeTotalTime
-               << Foam::nl << Foam::endl;
+    if (verbose_)
+    {
+        Foam::Info << "[PYBIND TIMING] call=" << callCount
+                   << " inputSize=" << flatInput.size()
+                   << " outputSize=" << outputSize
+                   << " array=" << arrayTime
+                   << " pythonCall=" << pythonCallTime
+                   << " copy=" << copyTime
+                   << " total=" << totalTime
+                   << " cumulativeTotal=" << cumulativeTotalTime
+                   << Foam::nl << Foam::endl;
+    }
 
     return output;
 }

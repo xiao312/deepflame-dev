@@ -12,27 +12,36 @@
 namespace
 {
 
-Ort::Env& globalOnnxEnv(const int intraOpThreads)
+Ort::Env& globalOnnxEnv(const int intraOpThreads, const bool verbose)
 {
     static std::unique_ptr<Ort::ThreadingOptions> threadingOptions;
     static std::unique_ptr<Ort::Env> env;
 
     if (!env)
     {
-        Foam::Info<< "[ONNX DEBUG] creating process-global Ort::ThreadingOptions"
-            << " intraOp=" << std::max(intraOpThreads, 1)
-            << " interOp=1 spin=0" << Foam::nl << Foam::endl;
+        if (verbose)
+        {
+            Foam::Info<< "[ONNX DEBUG] creating process-global Ort::ThreadingOptions"
+                << " intraOp=" << std::max(intraOpThreads, 1)
+                << " interOp=1 spin=0" << Foam::nl << Foam::endl;
+        }
 
         threadingOptions.reset(new Ort::ThreadingOptions());
         threadingOptions->SetGlobalIntraOpNumThreads(std::max(intraOpThreads, 1));
         threadingOptions->SetGlobalInterOpNumThreads(1);
         threadingOptions->SetGlobalSpinControl(0);
 
-        Foam::Info<< "[ONNX DEBUG] creating process-global Ort::Env" << Foam::nl << Foam::endl;
+        if (verbose)
+        {
+            Foam::Info<< "[ONNX DEBUG] creating process-global Ort::Env" << Foam::nl << Foam::endl;
+        }
         env.reset(new Ort::Env(*threadingOptions, ORT_LOGGING_LEVEL_WARNING, "DeepFlameOnnxRuntime"));
-        Foam::Info<< "[ONNX DEBUG] process-global Ort::Env ready" << Foam::nl << Foam::endl;
+        if (verbose)
+        {
+            Foam::Info<< "[ONNX DEBUG] process-global Ort::Env ready" << Foam::nl << Foam::endl;
+        }
     }
-    else
+    else if (verbose)
     {
         Foam::Info<< "[ONNX DEBUG] reusing process-global Ort::Env" << Foam::nl << Foam::endl;
     }
@@ -52,23 +61,22 @@ OnnxRuntimeBackend::OnnxRuntimeBackend(const InferenceBackendConfig& config)
     intraOpThreads_(config.intraOpThreads),
     configuredInputFeatureSize_(config.inputFeatureSize),
     deviceId_(config.deviceId),
+    verbose_(config.verbose),
     session_(nullptr),
     ioBinding_(nullptr),
     inputFeatureSize_(0),
     outputFeatureSize_(0)
 {}
 
-Ort::Env& OnnxRuntimeBackend::processGlobalEnv(const int intraOpThreads)
-{
-    return globalOnnxEnv(intraOpThreads);
-}
-
 void OnnxRuntimeBackend::ensureInitialized()
 {
     if (session_)
     {
-        Foam::Info<< "[ONNX DEBUG] session already initialized for model=" << modelPath_
-            << Foam::nl << Foam::endl;
+        if (verbose_)
+        {
+            Foam::Info<< "[ONNX DEBUG] session already initialized for model=" << modelPath_
+                << Foam::nl << Foam::endl;
+        }
         return;
     }
 
@@ -89,23 +97,32 @@ void OnnxRuntimeBackend::ensureInitialized()
 
     struct stat modelStat;
     const bool modelExists = (stat(modelPath_.c_str(), &modelStat) == 0);
-    Foam::Info<< "[ONNX DEBUG] ensureInitialized begin"
-        << " model=" << modelPath_
-        << " provider=" << executionProvider_
-        << " requestedIntraOpThreads=" << intraOpThreads_
-        << " configuredInputFeatureSize=" << configuredInputFeatureSize_
-        << " deviceId=" << deviceId_
-        << " modelExists=" << modelExists;
-    if (modelExists)
+    if (verbose_)
     {
-        Foam::Info<< " modelBytes=" << modelStat.st_size;
+        Foam::Info<< "[ONNX DEBUG] ensureInitialized begin"
+            << " model=" << modelPath_
+            << " provider=" << executionProvider_
+            << " requestedIntraOpThreads=" << intraOpThreads_
+            << " configuredInputFeatureSize=" << configuredInputFeatureSize_
+            << " deviceId=" << deviceId_
+            << " modelExists=" << modelExists;
+        if (modelExists)
+        {
+            Foam::Info<< " modelBytes=" << modelStat.st_size;
+        }
+        Foam::Info<< Foam::nl << Foam::endl;
     }
-    Foam::Info<< Foam::nl << Foam::endl;
 
     try
     {
-        Foam::Info<< "[ONNX DEBUG] configuring Ort::SessionOptions" << Foam::nl << Foam::endl;
+        if (verbose_)
+        {
+            Foam::Info<< "[ONNX DEBUG] configuring Ort::SessionOptions" << Foam::nl << Foam::endl;
+        }
         Ort::SessionOptions sessionOptions;
+        // Conservative per-process settings avoid oversubscription when many MPI
+        // ranks participate in a CFD run while still allowing a single reused
+        // ORT session per participating process.
         sessionOptions.SetGraphOptimizationLevel(GraphOptimizationLevel::ORT_ENABLE_EXTENDED);
         sessionOptions.SetExecutionMode(ExecutionMode::ORT_SEQUENTIAL);
         sessionOptions.SetIntraOpNumThreads(1);
@@ -118,38 +135,58 @@ void OnnxRuntimeBackend::ensureInitialized()
 
         if (executionProvider_ == "cuda")
         {
-            Foam::Info<< "[ONNX DEBUG] appending CUDA execution provider deviceId="
-                << deviceId_ << Foam::nl << Foam::endl;
+            if (verbose_)
+            {
+                Foam::Info<< "[ONNX DEBUG] appending CUDA execution provider deviceId="
+                    << deviceId_ << Foam::nl << Foam::endl;
+            }
             OrtCUDAProviderOptions cudaOptions;
             cudaOptions.device_id = deviceId_;
             sessionOptions.AppendExecutionProvider_CUDA(cudaOptions);
         }
 
-        Foam::Info<< "[ONNX DEBUG] Ort::SessionOptions ready"
-            << " graphOpt=ORT_ENABLE_EXTENDED exec=ORT_SEQUENTIAL intra=1 inter=1"
-            << " perSessionThreads=off memPattern=off cpuMemArena=off spinning=off"
-            << " provider=" << executionProvider_
-            << Foam::nl << Foam::endl;
+        if (verbose_)
+        {
+            Foam::Info<< "[ONNX DEBUG] Ort::SessionOptions ready"
+                << " graphOpt=ORT_ENABLE_EXTENDED exec=ORT_SEQUENTIAL intra=1 inter=1"
+                << " perSessionThreads=off memPattern=off cpuMemArena=off spinning=off"
+                << " provider=" << executionProvider_
+                << Foam::nl << Foam::endl;
 
-        Foam::Info<< "[ONNX DEBUG] requesting process-global Ort::Env" << Foam::nl << Foam::endl;
-        Ort::Env& env = processGlobalEnv(intraOpThreads_);
-        Foam::Info<< "[ONNX DEBUG] process-global Ort::Env acquired" << Foam::nl << Foam::endl;
-
-        Foam::Info<< "[ONNX DEBUG] creating Ort::Session for model load/graph optimization" << Foam::nl << Foam::endl;
+            Foam::Info<< "[ONNX DEBUG] requesting process-global Ort::Env" << Foam::nl << Foam::endl;
+        }
+        Ort::Env& env = globalOnnxEnv(intraOpThreads_, verbose_);
+        if (verbose_)
+        {
+            Foam::Info<< "[ONNX DEBUG] process-global Ort::Env acquired" << Foam::nl << Foam::endl;
+            Foam::Info<< "[ONNX DEBUG] creating Ort::Session for model load/graph optimization" << Foam::nl << Foam::endl;
+        }
         session_.reset(new Ort::Session(env, modelPath_.c_str(), sessionOptions));
-        Foam::Info<< "[ONNX DEBUG] Ort::Session created successfully" << Foam::nl << Foam::endl;
+        if (verbose_)
+        {
+            Foam::Info<< "[ONNX DEBUG] Ort::Session created successfully" << Foam::nl << Foam::endl;
+        }
 
         if (executionProvider_ == "cuda")
         {
-            Foam::Info<< "[ONNX DEBUG] creating Ort::IoBinding for CUDA EP" << Foam::nl << Foam::endl;
+            if (verbose_)
+            {
+                Foam::Info<< "[ONNX DEBUG] creating Ort::IoBinding for CUDA EP" << Foam::nl << Foam::endl;
+            }
             ioBinding_.reset(new Ort::IoBinding(*session_));
-            Foam::Info<< "[ONNX DEBUG] Ort::IoBinding ready" << Foam::nl << Foam::endl;
+            if (verbose_)
+            {
+                Foam::Info<< "[ONNX DEBUG] Ort::IoBinding ready" << Foam::nl << Foam::endl;
+            }
         }
 
         const std::size_t inputCount = session_->GetInputCount();
         const std::size_t outputCount = session_->GetOutputCount();
-        Foam::Info<< "[ONNX DEBUG] session I/O counts inputs=" << inputCount
-            << " outputs=" << outputCount << Foam::nl << Foam::endl;
+        if (verbose_)
+        {
+            Foam::Info<< "[ONNX DEBUG] session I/O counts inputs=" << inputCount
+                << " outputs=" << outputCount << Foam::nl << Foam::endl;
+        }
 
         if (inputCount != 1 || outputCount != 1)
         {
@@ -160,33 +197,51 @@ void OnnxRuntimeBackend::ensureInitialized()
                 << abort(FatalError);
         }
 
-        Foam::Info<< "[ONNX DEBUG] creating Ort allocator for metadata queries" << Foam::nl << Foam::endl;
+        if (verbose_)
+        {
+            Foam::Info<< "[ONNX DEBUG] creating Ort allocator for metadata queries" << Foam::nl << Foam::endl;
+        }
         Ort::AllocatorWithDefaultOptions allocator;
-        Foam::Info<< "[ONNX DEBUG] querying input/output names" << Foam::nl << Foam::endl;
+        if (verbose_)
+        {
+            Foam::Info<< "[ONNX DEBUG] querying input/output names" << Foam::nl << Foam::endl;
+        }
         auto inputName = session_->GetInputNameAllocated(0, allocator);
         auto outputName = session_->GetOutputNameAllocated(0, allocator);
         inputName_ = inputName.get();
         outputName_ = outputName.get();
-        Foam::Info<< "[ONNX DEBUG] inputName=" << inputName_
-            << " outputName=" << outputName_ << Foam::nl << Foam::endl;
+        if (verbose_)
+        {
+            Foam::Info<< "[ONNX DEBUG] inputName=" << inputName_
+                << " outputName=" << outputName_ << Foam::nl << Foam::endl;
+        }
 
         if (configuredInputFeatureSize_ > 0)
         {
             inputFeatureSize_ = static_cast<std::size_t>(configuredInputFeatureSize_);
-            Foam::Info
-                << "[ONNX DEBUG] skipping input/output shape metadata query; using configured inputFeatureSize="
-                << inputFeatureSize_ << Foam::nl << Foam::endl;
+            if (verbose_)
+            {
+                Foam::Info
+                    << "[ONNX DEBUG] skipping input/output shape metadata query; using configured inputFeatureSize="
+                    << inputFeatureSize_ << Foam::nl << Foam::endl;
+            }
         }
         else
         {
-            Foam::Info<< "[ONNX DEBUG] querying tensor type/shape metadata" << Foam::nl << Foam::endl;
+            if (verbose_)
+            {
+                Foam::Info<< "[ONNX DEBUG] querying tensor type/shape metadata" << Foam::nl << Foam::endl;
+            }
             auto inputInfo = session_->GetInputTypeInfo(0).GetTensorTypeAndShapeInfo();
             auto outputInfo = session_->GetOutputTypeInfo(0).GetTensorTypeAndShapeInfo();
             auto inputShape = inputInfo.GetShape();
             auto outputShape = outputInfo.GetShape();
 
-            Foam::Info<< "[ONNX DEBUG] input rank=" << inputShape.size()
-                << " output rank=" << outputShape.size() << Foam::nl << Foam::endl;
+            if (verbose_)
+            {
+                Foam::Info<< "[ONNX DEBUG] input rank=" << inputShape.size()
+                    << " output rank=" << outputShape.size() << Foam::nl << Foam::endl;
+            }
 
             if (inputShape.size() != 2 || outputShape.size() != 2)
             {
@@ -207,10 +262,16 @@ void OnnxRuntimeBackend::ensureInitialized()
             inputFeatureSize_ = static_cast<std::size_t>(inputShape[1]);
             outputFeatureSize_ = static_cast<std::size_t>(outputShape[1]);
 
-            Foam::Info<< "[ONNX DEBUG] feature sizes input=" << inputFeatureSize_
-                << " output=" << outputFeatureSize_ << Foam::nl << Foam::endl;
+            if (verbose_)
+            {
+                Foam::Info<< "[ONNX DEBUG] feature sizes input=" << inputFeatureSize_
+                    << " output=" << outputFeatureSize_ << Foam::nl << Foam::endl;
+            }
         }
-        Foam::Info<< "[ONNX DEBUG] ensureInitialized complete" << Foam::nl << Foam::endl;
+        if (verbose_)
+        {
+            Foam::Info<< "[ONNX DEBUG] ensureInitialized complete" << Foam::nl << Foam::endl;
+        }
     }
     catch (const Ort::Exception& e)
     {
@@ -337,17 +398,20 @@ std::vector<double> OnnxRuntimeBackend::inferFlat(
     cumulativeCopyTime += copyTime;
     cumulativeTotalTime += totalTime;
 
-    Foam::Info << "[ONNX TIMING] call=" << callCount
-               << " batchSize=" << batchSize
-               << " inputSize=" << flatInput.size()
-               << " outputSize=" << outputSize
-               << " convert=" << convertTime
-               << " tensorCreate=" << tensorCreateTime
-               << " run=" << runTime
-               << " copy=" << copyTime
-               << " total=" << totalTime
-               << " cumulativeTotal=" << cumulativeTotalTime
-               << Foam::nl << Foam::endl;
+    if (verbose_)
+    {
+        Foam::Info << "[ONNX TIMING] call=" << callCount
+                   << " batchSize=" << batchSize
+                   << " inputSize=" << flatInput.size()
+                   << " outputSize=" << outputSize
+                   << " convert=" << convertTime
+                   << " tensorCreate=" << tensorCreateTime
+                   << " run=" << runTime
+                   << " copy=" << copyTime
+                   << " total=" << totalTime
+                   << " cumulativeTotal=" << cumulativeTotalTime
+                   << Foam::nl << Foam::endl;
+    }
 
     return result;
 }

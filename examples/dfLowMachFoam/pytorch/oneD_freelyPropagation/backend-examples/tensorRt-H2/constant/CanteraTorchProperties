@@ -1,0 +1,93 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+  =========                 |
+  \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox
+   \\    /   O peration     | Website:  https://openfoam.org
+    \\  /    A nd           | Version:  7
+     \\/     M anipulation  |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version          2.0;
+    format           ascii;
+    class            dictionary;
+    location         "constant";
+    object           CanteraTorchProperties;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+chemistry            on;
+
+// Mechanism matching the trained H2 surrogate and the exported ONNX/TensorRT
+// serving bundle assumptions.
+CanteraMechanismFile "Burke2012_s9r23.yaml";
+
+transportModel       "Mix";
+
+// CPU chemistry tolerances retained for the mixed chemistry path.
+odeCoeffs
+{
+    "relTol"         1e-6;
+    "absTol"         1e-10;
+}
+
+inertSpecie          "N2";
+splittingStrategy    off;
+
+TorchSettings
+{
+    // Enable DNN-based chemistry.
+    torch             on;
+
+    // TensorRT currently runs only in the GPU-oriented centralized serving mode.
+    GPU               on;
+
+    // Set true to print backend initialization and per-call TensorRT timings.
+    log               false;
+
+    // Kept with the case payload for reference/parity with the original model.
+    torchModel        "DNN_model.pt";
+
+    // Select the TensorRT backend.
+    backend           tensorRt;
+
+    // Serialized TensorRT engine file. This engine is specific to the exported
+    // H2 wrapper, the TensorRT/CUDA version, and the local GPU/runtime setup.
+    trtEngine         "h2_full_inference_wrapper_fp32.plan";
+
+    // Input/output feature sizes per cell. Keep these aligned with the ONNX
+    // wrapper contract used when the engine was built.
+    trtInputFeatureSize 12;
+    trtOutputFeatureSize 9;
+
+    // Tensor names must match the names embedded in the ONNX wrapper / TensorRT
+    // engine. Use the names reported by Netron or trtexec if rebuilding.
+    trtInputTensorName cell_inputs;
+    trtOutputTensorName cell_outputs;
+
+    // GPU device used by TensorRT.
+    trtDeviceId       0;
+
+    // Enable pinned host memory for faster host-device transfers in the current
+    // backend implementation.
+    trtUsePinnedHostMemory true;
+
+    // TensorRT is currently implemented only for centralized inference. Keep
+    // this true unless the backend implementation is extended later.
+    trtCentralized    true;
+
+    frozenTemperature 510;
+    inferenceDeltaTime 1e-6;
+
+    // Number of ranks grouped under one inference-owning rank.
+    coresPerNode      4;
+}
+
+loadbalancing
+{
+    active           true;
+    log              false;
+    algorithm        allAverage;//headTail;
+}
+
+
+// ************************************************************************* //

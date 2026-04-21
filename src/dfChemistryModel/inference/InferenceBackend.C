@@ -12,6 +12,8 @@ namespace Foam
 
 autoPtr<InferenceBackend> InferenceBackend::New(const InferenceBackendConfig& config)
 {
+    // Keep backend selection centralized here so solver-side code only depends
+    // on the common runtime contract and not on backend-specific constructors.
     if (config.backendType == "pytorchEmbedded")
     {
         return autoPtr<InferenceBackend>(new PyTorchEmbeddedBackend(config));

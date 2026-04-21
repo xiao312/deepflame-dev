@@ -13,6 +13,9 @@
 namespace Foam
 {
 
+// Runtime configuration shared by all inference backends. The solver owns the
+// CFD-side orchestration and routes flat per-cell tensors through one backend
+// instance per participating process.
 struct InferenceBackendConfig
 {
     word backendType;
@@ -26,6 +29,7 @@ struct InferenceBackendConfig
     word inputTensorName;
     word outputTensorName;
     bool usePinnedHostMemory;
+    bool verbose;
 
     InferenceBackendConfig()
     :
@@ -39,7 +43,8 @@ struct InferenceBackendConfig
         deviceId(0),
         inputTensorName(""),
         outputTensorName(""),
-        usePinnedHostMemory(true)
+        usePinnedHostMemory(true),
+        verbose(false)
     {}
 };
 
@@ -50,6 +55,10 @@ public:
 
     static autoPtr<InferenceBackend> New(const InferenceBackendConfig& config);
 
+    // Execute one batched inference call.
+    // flatInput stores a contiguous [numCells, numFeatures] tensor flattened in
+    // row-major order. outputSize is the total number of doubles expected by the
+    // CFD caller after backend execution.
     virtual std::vector<double> inferFlat(
         const std::vector<double>& flatInput,
         std::size_t outputSize) = 0;

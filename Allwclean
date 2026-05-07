@@ -16,7 +16,9 @@ wclean ./src/dfCombustionModels
 wclean ./src/TurbulenceModels/compressible
 wclean ./src/TurbulenceModels/turbulenceModels
 wclean ./src/dfCanteraMixture
+wclean ./src/dfMeshTools
 wclean ./applications/utilities/flameSpeed
+wclean ./applications/utilities/dfAutoPatch
 wclean ./applications/solvers/dfSprayFoam
 wclean ./applications/solvers/df0DFoam
 wclean ./applications/solvers/dfLowMachFoam

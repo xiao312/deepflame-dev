@@ -51,6 +51,7 @@ $(workDir)/liquidProperties/MB/MB.C
 $(workDir)/liquidProperties/CH4N2O/CH4N2O.C
 $(workDir)/liquidProperties/nC3H8O/nC3H8O.C
 $(workDir)/liquidProperties/iC3H8O/iC3H8O.C
+liquidProperties/O2/O2.C
 
 
 solidProperties/solidProperties/solidProperties.C

@@ -60,6 +60,7 @@ set(SOURCES
     ${workDir}/liquidProperties/CH4N2O/CH4N2O.C
     ${workDir}/liquidProperties/nC3H8O/nC3H8O.C
     ${workDir}/liquidProperties/iC3H8O/iC3H8O.C
+    ${PROJECT_SOURCE_DIR}/liquidProperties/O2.C
 
     ${PROJECT_SOURCE_DIR}/solidProperties/solidProperties/solidProperties.C
     ${PROJECT_SOURCE_DIR}/solidProperties/solidProperties/solidPropertiesNew.C

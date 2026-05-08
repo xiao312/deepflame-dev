@@ -25,7 +25,7 @@ Class
     Foam::O2
 
 Description
-    water
+    Liquid Oxygen
 
 SourceFiles
     O2.C

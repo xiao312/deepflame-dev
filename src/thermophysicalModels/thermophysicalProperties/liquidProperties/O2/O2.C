@@ -1,3 +1,28 @@
+/*---------------------------------------------------------------------------*\
+  =========                 |
+  \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox
+   \\    /   O peration     | Website:  https://openfoam.org
+    \\  /    A nd           | Copyright (C) 2011-2019 OpenFOAM Foundation
+     \\/     M anipulation  |
+-------------------------------------------------------------------------------
+License
+    This file is part of OpenFOAM.
+
+    OpenFOAM is free software: you can redistribute it and/or modify it
+    under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    OpenFOAM is distributed in the hope that it will be useful, but WITHOUT
+    ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+    FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+    for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with OpenFOAM.  If not, see <http://www.gnu.org/licenses/>.
+
+\*---------------------------------------------------------------------------*/
+
 #include "O2.H"
 #include "addToRunTimeSelectionTable.H"
 
@@ -27,9 +52,9 @@ Foam::O2::O2()
         14710.24
     ),
 
-    pv_(2.68794635e+01, -9.58794777e+02, -1.05052914e+00, -6.90048355e-05, 1.21846002e-02),
-
     rho_(1.14632554e+02, 2.75655615e-01, 154.5994, 2.77505361e-01),
+
+    pv_(2.68794635e+01, -9.58794777e+02, -1.05052914e+00, -6.90048355e-05, 1.21846002e-02),
 
     hl_(154.5994, 2.89780460e+05, 6.00000000e-01, -7.05482356e-01, 4.75635399e-01, 0.0),
 
@@ -37,19 +62,19 @@ Foam::O2::O2()
 
     h_(-9.68908452e+05, 2.50637084e+04, -5.16097446e+02, 5.55884345e+00, -2.93205446e-02, 6.09448175e-05),
 
-    mu_(-2.11200494e+00, 7.62848791e+01, -1.61677107e+00, -7.70004913e-30, 1.31855757e+01),
-
-    sigma_(154.5994, 3.83537868e-02, 1.21069008e+00, 4.43081971e-02, -5.45942334e-02, 0.0),
-
-    kappa_(-9.19925611e-02, 1.93351101e-02, -4.51801714e-04, 4.79054225e-06, -2.47777620e-08, 5.00382658e-11),
-
     Cpg_(154.5994, 1.36975300e+01, 3.52746624e+02, -6.80059012e+00, -4.86846476e+01),
 
     B_(1.20601567e-02, -6.15471876e-04, 1.22024524e-05, -1.17761704e-07, 5.54479099e-10, -1.02125637e-12),
 
+    mu_(-2.11200494e+00, 7.62848791e+01, -1.61677107e+00, -7.70004913e-30, 1.31855757e+01),
+
     mug_(-1.76036598e+01, 1.50014787e+01, 1.23492678e+00, 1.17825779e-56, 2.53862523e+01),
 
+    kappa_(-9.19925611e-02, 1.93351101e-02, -4.51801714e-04, 4.79054225e-06, -2.47777620e-08, 5.00382658e-11),
+
     kappag_(-9.52797778e-01, 5.36816017e-02, -1.17434164e-03, 1.25352582e-05, -6.52648492e-08, 1.32897143e-10),
+
+    sigma_(154.5994, 3.83537868e-02, 1.21069008e+00, 4.43081971e-02, -5.45942334e-02, 0.0),
 
     D_(16.3, 18.5, 31.999, 28.0)
 {}

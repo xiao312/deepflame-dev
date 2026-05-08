@@ -1,0 +1,3 @@
+dfAutoPatch.C
+
+EXE = $(DF_APPBIN)/dfAutoPatch

@@ -694,6 +694,11 @@ endOfSection               {space}")"{space}
         yy_push_state(ignoreBlock);
     }
 
+{lbrac}{alpha}[^ \t\n\r\f()]* {
+        // Handles scheme-style blocks with alphabetic names, e.g. (cad/adv-options ...)
+        yy_push_state(ignoreBlock);
+    }
+
 <ignoreBlock,ignoreEmbeddedBlock>{space}{quote}{text}{quote} {
     }
 
@@ -703,6 +708,15 @@ endOfSection               {space}")"{space}
 <ignoreBlock,ignoreEmbeddedBlock>{space}{lbrac} {
         yy_push_state(ignoreEmbeddedBlock);
 
+    }
+
+<ignoreBlock,ignoreEmbeddedBlock>"[" {
+        // Handle Scheme-style square bracket blocks
+        yy_push_state(ignoreEmbeddedBlock);
+    }
+
+<ignoreBlock,ignoreEmbeddedBlock>"]" {
+        yy_pop_state();
     }
 
 <ignoreBlock,ignoreEmbeddedBlock>{space}{endOfSection} {

@@ -19,6 +19,7 @@ wclean ./src/dfCanteraMixture
 wclean ./src/dfMeshTools
 wclean ./applications/utilities/flameSpeed
 wclean ./applications/utilities/dfAutoPatch
+wclean ./applications/utilities/dfFluent3DMeshToFoam
 wclean ./applications/solvers/dfSprayFoam
 wclean ./applications/solvers/df0DFoam
 wclean ./applications/solvers/dfLowMachFoam

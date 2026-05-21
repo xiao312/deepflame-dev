@@ -30,3 +30,4 @@ wmake applications/solvers/dfSteadyFoam
 
 wmake applications/utilities/flameSpeed
 wmake applications/utilities/dfAutoPatch
+wmake applications/utilities/dfFluent3DMeshToFoam
